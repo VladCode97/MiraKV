@@ -5,7 +5,6 @@
 
 import { BINARY_TYPE } from "./domain/constants/binary-types.constant";
 import { HashMap } from "./index/hash-table/hash-table.ds";
-import { PageManager } from "./storage/page/page-manager";
 import { BinaryCodecManager } from "./domain/binary-codec/BinaryCodecManager.serializer";
 
 type TCollection<K, V> = {
@@ -17,23 +16,15 @@ type TUser = {
   name: string;
   doc: string;
   number: string;
-  whereLive: {
-    name: string;
-    city: string;
-  };
 };
 
 const user: TUser = {
   name: "Luis",
   doc: "89104952452",
   number: "+54 3084",
-  whereLive: {
-    name: "Colombia",
-    city: "Medellín",
-  },
 };
 
 const binaryCodec = new BinaryCodecManager();
-const buffer = binaryCodec.serialize(29);
-console.log(buffer)
+const buffer = binaryCodec.serialize(user);
+console.log(buffer);
 console.log(binaryCodec.deserialize(buffer));
