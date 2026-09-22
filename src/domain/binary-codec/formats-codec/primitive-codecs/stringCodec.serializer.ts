@@ -1,4 +1,4 @@
-import { ISerializer } from "../../interfaces/serializar.interface";
+import { ISerializer } from "../../../interfaces/serializar.interface";
 
 /**
  * Serializes and deserializes strings using UTF-8 encoding.

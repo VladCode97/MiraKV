@@ -1,10 +1,11 @@
 import { BINARY_TYPE, ENCODING } from "../../constants/binary-types.constant";
 import { ISerializer } from "../../interfaces/serializar.interface";
 import { TBinaryValues, TEncodeValue } from "../../types/binary.types";
-import { BooleanCodecSerializer } from "./booleanCodec.serializer";
-import { NumberCodecSerializer } from "./numberCodec.serializer";
-import { ObjectCodecSerializer } from "./objectCodec.serializer";
-import { StringCodecSerializer } from "./stringCodec.serializer";
+import { ObjectCodecSerializer } from "./object-codec/objectCodec.serializer";
+import { BooleanCodecSerializer } from "./primitive-codecs/booleanCodec.serializer";
+import { NumberCodecSerializer } from "./primitive-codecs/numberCodec.serializer";
+import { StringCodecSerializer } from "./primitive-codecs/stringCodec.serializer";
+
 
 /**
  * Returns the serializer responsible for a given binary type.

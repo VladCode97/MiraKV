@@ -1,5 +1,6 @@
-import { BOOLEAN_FORMAT } from "../../constants/binary-types.constant";
-import { ISerializer } from "../../interfaces/serializar.interface";
+import { BOOLEAN_FORMAT } from "../../../constants/binary-types.constant";
+import { ISerializer } from "../../../interfaces/serializar.interface";
+
 
 /**
  * Serializes and deserializes boolean values using the

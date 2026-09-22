@@ -1,9 +1,9 @@
-import { ISerializer } from "../../interfaces/serializar.interface";
-import { isObject } from "../../../utils/guard.utils";
-import { getTypeOf, getCodec, getTypeEncode } from "./codec.registry";
-import { BINARY_FORMAT } from "../../constants/binary-types.constant";
-import { BinaryEnvelope } from "../../envelope/binary.envelope";
-import { TBinaryValues } from "../../types/binary.types";
+import { ISerializer } from "../../../interfaces/serializar.interface";
+import { isObject } from "../../../../utils/guard.utils";
+import { getTypeOf, getCodec, getTypeEncode } from "../codec.registry";
+import { BINARY_FORMAT } from "../../../constants/binary-types.constant";
+import { BinaryEnvelope } from "../../../envelope/binary.envelope";
+import { TBinaryValues } from "../../../types/binary.types";
 
 /**
  * Serializes and deserializes JavaScript objects using the MiraKV binary format.

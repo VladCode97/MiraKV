@@ -1,8 +1,6 @@
-import {
-  BINARY_FORMAT,
-  NUMBER_FORMAT,
-} from "../../constants/binary-types.constant";
-import { ISerializer } from "../../interfaces/serializar.interface";
+import { NUMBER_FORMAT, BINARY_FORMAT } from "../../../constants/binary-types.constant";
+import { ISerializer } from "../../../interfaces/serializar.interface";
+
 
 /**
  * Serializes and deserializes JavaScript numbers using the
