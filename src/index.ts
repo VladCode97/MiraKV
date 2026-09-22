@@ -3,9 +3,9 @@
  * @description Entry point — basic usage example of {@link HashMap}.
  */
 
-import { BINARY_TYPE } from "./domain/constants/binary-types.constant";
 import { HashMap } from "./index/hash-table/hash-table.ds";
 import { BinaryCodecManager } from "./domain/binary-codec/BinaryCodecManager.serializer";
+import { writeFileSync, readFileSync } from "node:fs";
 
 type TCollection<K, V> = {
   name: string;
@@ -25,6 +25,6 @@ const user: TUser = {
 };
 
 const binaryCodec = new BinaryCodecManager();
-const buffer = binaryCodec.serialize(user);
+const data = readFileSync("./rust-user.mkv");
+const buffer = binaryCodec.deserialize(data);
 console.log(buffer);
-console.log(binaryCodec.deserialize(buffer));
