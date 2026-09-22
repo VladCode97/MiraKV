@@ -3,9 +3,37 @@
  * @description Entry point — basic usage example of {@link HashMap}.
  */
 
-import { HashMap } from './data-structure/hash-table.ds.ts'
-import { TUser } from './types/user.type.ts'
+import { BINARY_TYPE } from "./domain/constants/binary-types.constant";
+import { HashMap } from "./index/hash-table/hash-table.ds";
+import { PageManager } from "./storage/page/page-manager";
+import { BinaryCodecManager } from "./domain/binary-codec/BinaryCodecManager.serializer";
 
-const userDb = new HashMap<string, TUser>()
+type TCollection<K, V> = {
+  name: string;
+  operation: HashMap<K, V>;
+};
 
-userDb.add('u-001', { id: 'u-001', name: 'Luis', age: 30, genre: 'MALE', createdAt: new Date() })
+type TUser = {
+  name: string;
+  doc: string;
+  number: string;
+  whereLive: {
+    name: string;
+    city: string;
+  };
+};
+
+const user: TUser = {
+  name: "Luis",
+  doc: "89104952452",
+  number: "+54 3084",
+  whereLive: {
+    name: "Colombia",
+    city: "Medellín",
+  },
+};
+
+const binaryCodec = new BinaryCodecManager();
+const buffer = binaryCodec.serialize(29);
+console.log(buffer)
+console.log(binaryCodec.deserialize(buffer));
