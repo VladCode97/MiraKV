@@ -11,7 +11,7 @@
  * @returns `true` and narrows the type to `string` if the check passes.
  */
 export function isString(input: unknown): input is string {
-  return typeof input === "string";
+  return typeof input === 'string'
 }
 
 /**
@@ -21,18 +21,19 @@ export function isString(input: unknown): input is string {
  * @returns `true` and narrows the type to `number` if the check passes.
  */
 export function isNumber(input: unknown): input is number {
-  return typeof input === "number";
+  return typeof input === 'number'
 }
 
 /**
- * Determines whether a value is a non-null object.
- * Narrows the input type from `unknown` to `object` when the value
- * is an object and not `null`.
- * @param input Value to check.
- * @returns `true` when the value is a non-null object; otherwise `false`.
+ * Checks whether `input` is a non-null plain JavaScript object.
+ *
+ * Arrays are excluded — only `typeof input === 'object'` values that
+ * are not `null` and not arrays pass this guard. Used by
+ * {@link ObjectCodecSerializer} to validate records before serialization.
+ *
+ * @param input - The value to test.
+ * @returns `true` and narrows the type to `Record<string, unknown>` if the check passes.
  */
 export function isObject(input: unknown): input is Record<string, unknown> {
-  return (
-    input !== null && typeof input === "object" && input.constructor === Object
-  );
+  return typeof input === 'object' && input !== null && !Array.isArray(input)
 }

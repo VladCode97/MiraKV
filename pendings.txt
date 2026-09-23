@@ -1,0 +1,63 @@
+Lo que cerraría antes de pasar a Collection
+
+1. Capacidad de página
+
+Terminar:
+if (this.slotEnd >= this.recordStart) {
+
+  // create new page
+
+}
+
+Pero la condición correcta tendrá que considerar el record que estás intentando insertar + su slot.
+
+2. findId() un poquito más robusto
+
+Ahora mismo tienes el camino feliz funcionando. Probaría:
+existing key
+non-existing key
+multiple records
+records en posiciones diferentes
+
+No necesitas convertirlo todavía en una API enorme.
+
+3. Actualización / eliminación
+Aquí tienes una decisión interesante porque te obliga a pensar físicamente qué ocurre con:
+Slot → Offset + Length → Record
+Por ejemplo, eliminar un record no significa necesariamente mover inmediatamente todos los bytes.
+
+Podrías inicialmente marcar el slot como eliminado.
+
+Eso te introduce naturalmente en free space / tombstones, que son conceptos importantes del storage engine.
+
+⸻
+
+4. Test de persistencia real
+Este me parece obligatorio antes de cerrar:
+Proceso A
+
+    ↓
+
+insert
+
+    ↓
+
+persist
+
+    ↓
+
+🔥 matar proceso
+
+Proceso B
+
+    ↓
+
+abrir archivo
+
+    ↓
+
+reconstruir
+
+    ↓
+
+findId()

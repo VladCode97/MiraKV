@@ -11,6 +11,13 @@ export const BINARY_TYPE = {
   NULL: 0x05,
 } as const;
 
+/**
+ * Identifies the binary encoding used to represent a value's payload.
+ * The encoding is stored in the final byte of a MiraKV binary envelope:
+ * [version][type][length][payload][encoding]
+ * The `type` describes what the value is, while `encoding` describes
+ * how that value is represented at the binary level.
+ */
 export const ENCODING = {
   RESERVED: 0x00,
   IEEE_754_BINARY64: 0x01,
@@ -38,11 +45,20 @@ export const NUMBER_FORMAT = {
   ENCODING: ENCODING.IEEE_754_BINARY64,
 } as const;
 
+/**
+ * Defines the binary format used to represent boolean values.
+ * Boolean values are stored using a single byte.
+ */
 export const BOOLEAN_FORMAT = {
   type: BINARY_TYPE.BOOLEAN,
   SIZE_BYTE: 1,
 };
 
+/**
+ * Defines the binary format used to represent string values.
+ * Strings are encoded using UTF-8.
+ * The encoded size depends on the string content.
+ */
 export const STRING_FORMAT = {
   type: BINARY_TYPE.STRING,
 };
