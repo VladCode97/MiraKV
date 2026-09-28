@@ -1,57 +1,54 @@
-/**
- * @file index.ts
- * @description Entry point — basic usage example of {@link HashMap}.
- */
+import { Collection } from "./collections/collection";
+import { ECities, ECountry, TUser } from "./domain/types/user.type";
 
-import { HashMap } from "./index/hash-table/hash-table.ds";
-import { BinaryCodecManager } from "./domain/binary-codec/BinaryCodecManager.serializer";
-import { PageManager } from "./storage/page/page-manager";
-import { AVLTree } from "./index/AVL/avl-tree.ds";
+async function main() {
+  const userCollection = new Collection<TUser>();
 
-type TCollection<K, V> = {
-  name: string;
-  operation: HashMap<K, V>;
-};
+  const userLuis: TUser = {
+    name: "Luis",
+    description: "Joven",
+    doc: "1122333",
+    number: "+51 302 4958",
+    createdAt: new Date("2091-02-25"),
+    country: {
+      name: ECountry.COL,
+      city: ECities.CAL,
+    },
+    roles: ["System engineer", "Software engineer", "Software architect"],
+  };
 
-type TUser = {
-  name: string;
-  doc: string;
-  number: string;
-};
+  const userJudith: TUser = {
+    name: "Judith",
+    description: "Adulto",
+    doc: "33445566",
+    number: "+51 301 4958",
+    createdAt: new Date("2091-02-20"),
+    country: {
+      name: ECountry.COL,
+      city: ECities.CAL,
+    },
+    roles: ["Techer"],
+  };
 
-const user: TUser = {
-  name: "Luis",
-  doc: "89104952452",
-  number: "+54 3084",
-};
+  const userCelmira: TUser = {
+    name: "Celmira",
+    description: "Adulto",
+    doc: "778899",
+    number: "+51 301 4958",
+    createdAt: new Date("2091-02-21"),
+    country: {
+      name: ECountry.COL,
+      city: ECities.CAL,
+    },
+    roles: ["Accounter"],
+  };
 
-const user_: TUser = {
-  name: "Judith",
-  doc: "128358",
-  number: "+54 1084",
-};
+  await userCollection.insert(userLuis, userLuis.doc);
+  await userCollection.insert(userJudith, userJudith.doc);
+  await userCollection.insert(userCelmira, userCelmira.doc);
 
-export type TRecordLocation = {
-  pageId: number;
-  slotId: number;
-};
+  const response = await userCollection.findById(userLuis.doc);
+  console.log(response);
+}
 
-/**
- * Structure index of AVL
- */
-const indexAVL: AVLTree<string, TRecordLocation> = new AVLTree<
-  string,
-  TRecordLocation
->((a, b) => a.localeCompare(b));
-
-const pageManager: PageManager = new PageManager(
-  new BinaryCodecManager(),
-  indexAVL,
-);
-pageManager.appendRecord(user, user.doc);
-pageManager.appendRecord(user_, user_.doc);
-
-(async () => {
-  const user = await pageManager.findId("O-EXISTE");
-  console.log(user);
-})();
+main();

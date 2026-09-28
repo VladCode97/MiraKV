@@ -1,12 +1,10 @@
-import { TRecordLocation } from "../..";
 import { BINARY_FORMAT } from "../../domain/constants/binary-types.constant";
+import { FILE_OPERATIONS } from "../../domain/constants/file-operations.constant";
 import { ISerializer } from "../../domain/interfaces/serializar.interface";
+import { TRecordLocation } from "../../domain/types/page.type";
 import { AVLTree } from "../../index/AVL/avl-tree.ds";
-import {
-  pageIdAllocatorUtil,
-  slotIdAllocatorUtil,
-} from "../../utils/page.util";
-import { appendFile, readFile } from "node:fs/promises";
+import { pageIdAllocatorUtil } from "../../utils/page.util";
+import { open, readFile, FileHandle } from "node:fs/promises";
 /**
  * Manages the lifecycle and physical layout of pages in MiraKV.
  * A page is a fixed-size binary buffer used to store records and
@@ -15,10 +13,11 @@ import { appendFile, readFile } from "node:fs/promises";
 export class PageManager {
   private readonly PAGE_SIZE_BYTES: number; // 16 KiB
   private readonly SLOT_SIZE: number;
-  private recordStart: number;
-  private slotEnd: number;
-  private pageBuffer: Buffer;
-  private readonly PROVISIONAL_ROUTE: string;
+  private recordStart!: number;
+  private slotEnd!: number;
+  private pageBuffer!: Buffer;
+  private readonly ROUTE_FILE: string;
+  private fileHandler!: FileHandle;
 
   /**
    * Creates a PageManager using the provided serializer to convert
@@ -31,44 +30,53 @@ export class PageManager {
   ) {
     this.PAGE_SIZE_BYTES = 16 * 1024;
     this.SLOT_SIZE = 9;
-    this.recordStart = this.PAGE_SIZE_BYTES;
-    this.pageBuffer = Buffer.alloc(this.PAGE_SIZE_BYTES);
-    // Header ends at byte 9, so slotEnd starts at 9 and advances as slots are added.
-    this.slotEnd = 9;
+    this.ROUTE_FILE = "./data/mira.mkv";
     this.createPage();
-    this.PROVISIONAL_ROUTE = "./data/mira.mkv";
   }
 
   /**
-   * Creates a new empty page with the configured page size.
-   * Initializes the page header with a unique page identifier
-   * and an empty slot count.
+   * Opens the storage file for reading and writing.
+   *
+   * Uses `w+`, which creates the file if it does not exist and truncates
+   * it to zero length if it does. Pages are written by absolute position
+   * (`pageId * PAGE_SIZE_BYTES`), so each run starts from a clean file.
+   *
+   * Must be awaited before any call to {@link appendRecord} or
+   * {@link findId}.
+   *
+   * @returns A promise that resolves once the file handle is ready.
    */
-  private createPage(): void {
-    const header = this.pageBuffer.subarray(0, 9);
-    header.writeUInt8(BINARY_FORMAT.VERSION, 0); // VERSION
-    header.writeUInt32LE(pageIdAllocatorUtil(), 1); // page_id
-    header.writeUInt32LE(0, 5); // slots_counts
+  public async initialize(): Promise<void> {
+    this.fileHandler = await open(this.ROUTE_FILE, FILE_OPERATIONS.WRITE_READ);
   }
+
+  public async close(): Promise<void> {
+    await this.persistPage();
+    await this.fileHandler.close();
+  }
+
+  // ─── Public API ──────────────────────────────────────────────────────────
 
   /**
    * Serializes a record and prepares its binary representation
    * for insertion into a page.
    * @param record Record to serialize.
    */
-  public appendRecord(record: unknown, key: string): void {
+  public async appendRecord(record: unknown, key: string): Promise<void> {
     const recordSerialized = this.serializer.serialize(record);
-    if (this.slotEnd >= this.recordStart) {
-      //todo:::: Create a new page
+    const newSlotEnd = this.slotEnd + this.SLOT_SIZE;
+    const newRecordStart = this.recordStart - recordSerialized.byteLength;
+    if (newSlotEnd > newRecordStart) {
+      await this.persistPage();
+      this.createPage();
     }
     const { offset, length } = this.allocateRecord(
       recordSerialized,
       recordSerialized.byteLength,
     );
-    const slotId = slotIdAllocatorUtil();
+    const slotId = (this.slotEnd - 9) / this.SLOT_SIZE;
     this.allocateSlot(slotId, offset, length);
     this.updateSlotCount();
-    this.persistPage();
     const header = this.pageBuffer.subarray(0, 9);
     this.indexAVL.append(key, {
       pageId: header.readUInt32LE(1),
@@ -94,8 +102,8 @@ export class PageManager {
    * @returns A promise that resolves to the deserialized record, or `{}`
    *          if the key does not exist.
    */
-  public async findId(key: string) {
-    const file = await readFile(this.PROVISIONAL_ROUTE);
+  public async findId(key: string): Promise<unknown> {
+    const file = await readFile(this.ROUTE_FILE);
     const element = this.indexAVL.search(key);
     if (element === null) {
       return {};
@@ -116,7 +124,7 @@ export class PageManager {
    * @returns The current page, or undefined if no page is available.
    */
   public async getPage(): Promise<unknown[] | undefined> {
-    const file = await readFile(this.PROVISIONAL_ROUTE);
+    const file = await readFile(this.ROUTE_FILE);
     const header = file.subarray(0, 9);
     const slotCount = header.readUInt32LE(5);
     const records = [];
@@ -130,6 +138,23 @@ export class PageManager {
       records.push(this.serializer.deserialize(record));
     }
     return records;
+  }
+
+  // ─── Private helpers ───────────────────────────────────────────────────────
+
+  /**
+   * Creates a new empty page with the configured page size.
+   * Initializes the page header with a unique page identifier
+   * and an empty slot count.
+   */
+  private createPage(): void {
+    this.pageBuffer = Buffer.alloc(this.PAGE_SIZE_BYTES);
+    this.recordStart = this.PAGE_SIZE_BYTES;
+    this.slotEnd = 9;
+    const header = this.pageBuffer.subarray(0, 9);
+    header.writeUInt8(BINARY_FORMAT.VERSION, 0);
+    header.writeUInt32LE(pageIdAllocatorUtil(), 1);
+    header.writeUInt32LE(0, 5);
   }
 
   /**
@@ -194,6 +219,14 @@ export class PageManager {
    * @returns A promise that resolves when the page has been persisted.
    */
   private async persistPage(): Promise<void> {
-    await appendFile(this.PROVISIONAL_ROUTE, this.pageBuffer);
+    const header = this.pageBuffer.subarray(0, 9);
+    const pageId = header.readInt32LE(1);
+    const position = pageId * this.PAGE_SIZE_BYTES;
+    await this.fileHandler.write(
+      this.pageBuffer,
+      0,
+      this.pageBuffer.byteLength,
+      position,
+    );
   }
 }

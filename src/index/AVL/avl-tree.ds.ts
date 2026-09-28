@@ -121,20 +121,6 @@ export class AVLTree<K, V> implements IIndex<K, V> {
   }
 
   /**
-   * Returns `true` when the tree is sparse enough to be demoted back to a
-   * {@link LinkedList} bucket. The threshold is `height <= 1`, which covers
-   * trees with 3 or fewer nodes — small enough that O(n) list traversal
-   * is cheaper than maintaining the tree overhead.
-   *
-   * Called by {@link HashMap.remove} after every deletion on an AVL bucket.
-   *
-   * @returns `true` if the tree should be demoted; otherwise `false`.
-   */
-  public shouldDemote(): boolean {
-    return this.height() <= 1;
-  }
-
-  /**
    * Exposes the root node of the tree for read-only access.
    * Used by {@link HashMap.migrateToLinkedList} to traverse the tree
    * without breaking encapsulation beyond a controlled getter.

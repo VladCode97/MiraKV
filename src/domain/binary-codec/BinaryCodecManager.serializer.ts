@@ -1,7 +1,7 @@
 import { BINARY_FORMAT } from "../constants/binary-types.constant";
 import { BinaryEnvelope } from "../envelope/binary.envelope";
 import { ISerializer } from "../interfaces/serializar.interface";
-import { TBinaryValues, TEncodeValue } from "../types/binary.types";
+import { TBinaryValues } from "../types/binary.types";
 import {
   getTypeOf,
   getCodec,

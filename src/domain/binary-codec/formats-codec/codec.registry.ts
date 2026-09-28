@@ -1,11 +1,12 @@
 import { BINARY_TYPE, ENCODING } from "../../constants/binary-types.constant";
 import { ISerializer } from "../../interfaces/serializar.interface";
 import { TBinaryValues, TEncodeValue } from "../../types/binary.types";
+import { ArrayCodecSeriliazer } from "./object-codec/arrayCodec.serializer";
 import { ObjectCodecSerializer } from "./object-codec/objectCodec.serializer";
 import { BooleanCodecSerializer } from "./primitive-codecs/booleanCodec.serializer";
+import { DateCodecSerializer } from "./primitive-codecs/dateCodec.serializer";
 import { NumberCodecSerializer } from "./primitive-codecs/numberCodec.serializer";
 import { StringCodecSerializer } from "./primitive-codecs/stringCodec.serializer";
-
 
 /**
  * Returns the serializer responsible for a given binary type.
@@ -23,6 +24,10 @@ export function getCodec(dataKind: TBinaryValues): ISerializer {
       return new StringCodecSerializer();
     case BINARY_TYPE.OBJECT:
       return new ObjectCodecSerializer();
+    case BINARY_TYPE.DATE:
+      return new DateCodecSerializer();
+    case BINARY_TYPE.ARRAY:
+      return new ArrayCodecSeriliazer();
     default:
       throw new Error();
   }
@@ -41,6 +46,10 @@ export function getTypeEncode(type: TBinaryValues): TEncodeValue {
       return ENCODING.UTF_8;
     case BINARY_TYPE.BOOLEAN:
       return ENCODING.BOOLEAN_8;
+    case BINARY_TYPE.DATE:
+      return ENCODING.UNIX_TIMESTAMP_MS;
+    case BINARY_TYPE.ARRAY:
+      return ENCODING.HOMOGENEOUS_ARRAY;
     default:
       return ENCODING.RESERVED;
   }
@@ -53,6 +62,12 @@ export function getTypeEncode(type: TBinaryValues): TEncodeValue {
  */
 export function getTypeOf(record: unknown): TBinaryValues {
   if (record === null) return BINARY_TYPE.NULL;
+  if (Array.isArray(record)) {
+    return BINARY_TYPE.ARRAY;
+  }
+  if (record instanceof Date) {
+    return BINARY_TYPE.DATE;
+  }
   const type = typeof record;
   if (type === "object") {
     return BINARY_TYPE.OBJECT;

@@ -1,14 +1,30 @@
 /**
+ * @file binary-types.constant.ts
+ * @description Type identifiers, encodings, and per-type format constants
+ * that define the MiraKV binary format.
+ */
+
+/**
  * Binary type identifiers used by the MiraKV binary format.
  * Each identifier represents the semantic type of a serialized value.
  */
 export const BINARY_TYPE = {
+  /** Reserved / unsupported type. */
   RESERVED: 0x00,
+  /** Boolean value. */
   BOOLEAN: 0x01,
+  /** Numeric value (IEEE 754 binary64). */
   NUMBER: 0x02,
+  /** UTF-8 string value. */
   STRING: 0x03,
+  /** Object value (may contain nested values). */
   OBJECT: 0x04,
+  /** Explicit null value. */
   NULL: 0x05,
+  /** Date value. */
+  DATE: 0x06,
+  /** Homogeneous primitive array. */
+  ARRAY: 0x07,
 } as const;
 
 /**
@@ -19,10 +35,18 @@ export const BINARY_TYPE = {
  * how that value is represented at the binary level.
  */
 export const ENCODING = {
+  /** Reserved / no specific encoding. */
   RESERVED: 0x00,
+  /** 64-bit floating point, IEEE 754 binary64. */
   IEEE_754_BINARY64: 0x01,
+  /** UTF-8 encoded text. */
   UTF_8: 0x02,
+  /** Single-byte boolean (0 or 1). */
   BOOLEAN_8: 0x03,
+  /** Unix timestamp in milliseconds. */
+  UNIX_TIMESTAMP_MS: 0x04,
+  /** Homogeneous array with length-prefixed elements. */
+  HOMOGENEOUS_ARRAY: 0x05,
 } as const;
 
 /**
