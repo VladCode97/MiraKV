@@ -21,13 +21,15 @@ const (
 	TypeObject   = 0x04
 	TypeNull     = 0x05
 	TypeDate     = 0x06
+	TypeArray    = 0x07
 
 	// Encodings
-	EncodingReserved   = 0x00
-	EncodingFloat64    = 0x01
-	EncodingUTF8       = 0x02
-	EncodingBoolean8   = 0x03
-	EncodingUnixTimeMs = 0x04
+	EncodingReserved       = 0x00
+	EncodingFloat64        = 0x01
+	EncodingUTF8           = 0x02
+	EncodingBoolean8       = 0x03
+	EncodingUnixTimeMs     = 0x04
+	EncodingHomogeneousArr = 0x05
 )
 
 type Envelope struct {
@@ -222,10 +224,89 @@ func decodeEnvelope(data []byte, depth int) (any, error) {
 	case TypeObject:
 		return decodeObject(payload, depth+1)
 
+	case TypeArray:
+		return decodeArray(payload)
+
 	default:
 		return nil, fmt.Errorf(
 			"unsupported binary type: 0x%02X",
 			typ,
+		)
+	}
+}
+
+// decodeArray decodes a homogeneous primitive array payload.
+//
+// Layout: [elementType:1][count:4] followed by count elements, each encoded
+// as [length:4][payload:length]. Element payloads are raw codec output (no
+// per-element envelope), so the shared elementType from the header drives how
+// each payload is decoded.
+func decodeArray(data []byte) ([]any, error) {
+	if len(data) < 5 {
+		return nil, fmt.Errorf("invalid array payload: %d bytes", len(data))
+	}
+
+	elementType := data[0]
+	count := binary.LittleEndian.Uint32(data[1:5])
+
+	elements := make([]any, 0, count)
+	offset := 5
+
+	for i := uint32(0); i < count; i++ {
+		if offset+4 > len(data) {
+			return nil, fmt.Errorf("missing element length in array")
+		}
+
+		length := int(binary.LittleEndian.Uint32(data[offset : offset+4]))
+		offset += 4
+
+		if offset+length > len(data) {
+			return nil, fmt.Errorf("element payload exceeds array payload")
+		}
+
+		payload := data[offset : offset+length]
+		offset += length
+
+		value, err := decodeArrayElement(elementType, payload)
+		if err != nil {
+			return nil, err
+		}
+
+		elements = append(elements, value)
+	}
+
+	return elements, nil
+}
+
+// decodeArrayElement decodes a single array element given its shared type.
+func decodeArrayElement(elementType byte, payload []byte) (any, error) {
+	switch elementType {
+	case TypeString:
+		return string(payload), nil
+
+	case TypeNumber:
+		if len(payload) != 8 {
+			return nil, fmt.Errorf(
+				"invalid number payload length: %d",
+				len(payload),
+			)
+		}
+		bits := binary.LittleEndian.Uint64(payload)
+		return bitsToFloat64(bits), nil
+
+	case TypeBoolean:
+		if len(payload) != 1 {
+			return nil, fmt.Errorf(
+				"invalid boolean payload length: %d",
+				len(payload),
+			)
+		}
+		return payload[0] != 0, nil
+
+	default:
+		return nil, fmt.Errorf(
+			"unsupported array element type: 0x%02X",
+			elementType,
 		)
 	}
 }
@@ -319,6 +400,15 @@ func printValue(value any, indent int) {
 
 	case time.Time:
 		fmt.Printf("%s%s\n", prefix, value.Format(time.RFC3339Nano))
+
+	case []any:
+		fmt.Println(prefix + "[")
+
+		for _, item := range value {
+			printValue(item, indent+1)
+		}
+
+		fmt.Println(prefix + "]")
 
 	default:
 		fmt.Printf("%v\n", value)

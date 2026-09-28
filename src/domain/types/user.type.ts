@@ -69,5 +69,6 @@ export type TUser = {
   country: TCountry;
   /** Timestamp of when the record was created. */
   createdAt: Date;
+  /** Roles assigned to the user — a homogeneous array of strings. */
   roles: string[];
 };

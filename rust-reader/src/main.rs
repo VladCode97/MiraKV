@@ -11,6 +11,7 @@ const TYPE_STRING: u8 = 0x03;
 const TYPE_OBJECT: u8 = 0x04;
 const TYPE_NULL: u8 = 0x05;
 const TYPE_DATE: u8 = 0x06;
+const TYPE_ARRAY: u8 = 0x07;
 
 fn read_u32_le(data: &[u8]) -> u32 {
     u32::from_le_bytes([data[0], data[1], data[2], data[3]])
@@ -81,6 +82,7 @@ enum Value {
     String(String),
     Date(String),
     Object(Vec<(String, Value)>),
+    Array(Vec<Value>),
 }
 
 fn decode_envelope(data: &[u8], depth: usize) -> Result<Value, String> {
@@ -155,7 +157,79 @@ fn decode_envelope(data: &[u8], depth: usize) -> Result<Value, String> {
 
         TYPE_OBJECT => decode_object(payload, depth + 1),
 
+        TYPE_ARRAY => decode_array(payload),
+
         _ => Err(format!("Unsupported binary type: 0x{:02X}", value_type)),
+    }
+}
+
+/// Decodes a homogeneous primitive array payload.
+///
+/// Layout: `[element_type:1][count:4]` followed by `count` elements, each
+/// encoded as `[length:4][payload:length]`. Unlike object properties, the
+/// element payloads are raw codec output (no per-element envelope), so the
+/// shared `element_type` from the header drives how each payload is decoded.
+fn decode_array(data: &[u8]) -> Result<Value, String> {
+    if data.len() < 5 {
+        return Err(format!("Invalid array payload: {} bytes", data.len()));
+    }
+
+    let element_type = data[0];
+    let count = read_u32_le(&data[1..5]) as usize;
+
+    let mut elements = Vec::with_capacity(count);
+    let mut offset = 5;
+
+    for _ in 0..count {
+        if offset + 4 > data.len() {
+            return Err("Missing element length in array".to_string());
+        }
+
+        let length = read_u32_le(&data[offset..offset + 4]) as usize;
+        offset += 4;
+
+        if offset + length > data.len() {
+            return Err("Element payload exceeds array payload".to_string());
+        }
+
+        let payload = &data[offset..offset + length];
+        offset += length;
+
+        let value = decode_array_element(element_type, payload)?;
+        elements.push(value);
+    }
+
+    Ok(Value::Array(elements))
+}
+
+/// Decodes a single array element payload given its shared element type.
+fn decode_array_element(element_type: u8, payload: &[u8]) -> Result<Value, String> {
+    match element_type {
+        TYPE_STRING => {
+            let value = String::from_utf8(payload.to_vec()).map_err(|e| e.to_string())?;
+            Ok(Value::String(value))
+        }
+
+        TYPE_NUMBER => {
+            if payload.len() != 8 {
+                return Err(format!("Invalid number payload length: {}", payload.len()));
+            }
+            let mut bytes = [0u8; 8];
+            bytes.copy_from_slice(payload);
+            Ok(Value::Number(f64::from_le_bytes(bytes)))
+        }
+
+        TYPE_BOOLEAN => {
+            if payload.len() != 1 {
+                return Err(format!("Invalid boolean payload length: {}", payload.len()));
+            }
+            Ok(Value::Boolean(payload[0] != 0))
+        }
+
+        _ => Err(format!(
+            "Unsupported array element type: 0x{:02X}",
+            element_type
+        )),
     }
 }
 
@@ -246,6 +320,16 @@ fn print_value(value: &Value, indent: usize) {
             }
 
             println!("{}}}", prefix);
+        }
+
+        Value::Array(items) => {
+            println!("{}[", prefix);
+
+            for item in items {
+                print_value(item, indent + 1);
+            }
+
+            println!("{}]", prefix);
         }
     }
 }

@@ -1,120 +1,132 @@
 # MiraKV
 
-MiraKV is an experimental key-value storage engine built from scratch to explore how database and storage systems work internally.
+MiraKV is an experimental key-value storage engine built from scratch to
+explore how database and storage systems work internally — from binary
+representation on disk up to indexing and retrieval.
 
-The project focuses on understanding and implementing the fundamental mechanisms behind:
+> **Status:** Experimental · under active development.
+> The core write/read path works end-to-end; several components are
+> intentionally incremental. See [Current Status](#current-status).
 
-- binary data representation;
-- persistent storage;
-- page-based storage;
-- record layout and slot management;
-- indexing structures;
-- query execution;
-- adaptive indexing;
-- partitioning and replication;
-- and workload-oriented storage strategies.
+---
 
-MiraKV is primarily a learning and experimentation project. The goal is not to compete with mature database systems, but to progressively build a storage engine while understanding the mechanisms that make those systems work.
+## What Works Today
+
+The following is implemented and runs end-to-end:
+
+- **Custom binary format** — a versioned envelope with per-value type and
+  encoding metadata.
+- **Value codecs** — `string`, `number`, `boolean`, `object` (including
+  nested objects), `date`, and homogeneous primitive `array`.
+- **Page-based storage** — 16 KiB pages with slot metadata, written to disk
+  by absolute page position.
+- **Indexing** — a self-balancing AVL tree mapping keys to physical record
+  locations, plus a hash map implementation over a shared index contract.
+- **Typed collections** — a `Collection<T>` API for insert and lookup by key.
+
+A record can be inserted as a typed object, serialized to the MiraKV binary
+format, paged to disk, indexed, and later retrieved by key.
 
 ---
 
 ## Motivation
 
-MiraKV is built around six main goals:
+MiraKV is built around a few main goals:
 
-1. Understand how databases work internally and build the fundamental mechanisms of a storage engine.
+1. Understand how databases work internally by building the fundamental
+   mechanisms of a storage engine.
 2. Explore adaptive indexing strategies based on observed query workloads.
-3. Design a simple, intuitive, and composable query language.
+3. Explore columnar-friendly storage through homogeneous data representation.
 4. Explore distributed mechanisms such as replication and partitioning.
-5. Support columnar data processing when the workload requires it.
-6. Explore mechanisms for predictable and low response times under defined workloads, dataset sizes, and resource constraints.
+5. Explore predictable, low response times under defined workloads, dataset
+   sizes, and resource constraints.
 
-The project is intended to evolve from a single-node engine toward a distributed system while preserving the principles that define its design.
+The project is intended to evolve from a single-node engine toward a
+distributed system while preserving the principles that define its design.
 
 ---
 
 ## Design Principles
 
 ### Complexity Reduction
-
-The internal complexity of the system may grow, but the complexity exposed to the user should grow as little as possible.
+Internal complexity may grow, but the complexity exposed to the user should
+grow as little as possible.
 
 ### External Simplicity
-
-Internal implementation details should not be unnecessarily exposed to users.
-
-### Composition
-
-System capabilities should be composable without introducing a completely different vocabulary for every operation.
+Internal implementation details should not be unnecessarily exposed.
 
 ### Separation Between Logical and Physical Representation
+Logical data representation stays independent from its binary and physical
+representation.
 
-Logical data representation should remain independent from its binary and physical representation.
+### Pluggable Indexing
+Index structures sit behind a single contract (`IIndex`), so a bucket or a
+collection can swap one structure for another without changing the layers
+above it. This is the foundation for future workload-based adaptive indexing.
+
+### Homogeneous Data Over Deep Nesting
+MiraKV favors homogeneous, flat data over deeply nested structures. This is a
+deliberate choice: homogeneous data compresses better, has a predictable
+binary layout, and aligns with columnar processing — the same principle
+behind analytical engines like Parquet and ClickHouse.
 
 ### Explicit Decisions
-
-Important architectural decisions should be documented together with alternatives and trade-offs.
-
-### Workload-Based Adaptation
-
-Internal structures should be able to adapt to observed query behavior.
+Important architectural decisions are documented together with their
+alternatives and trade-offs.
 
 ### Incremental Evolution
-
-Individual components should be able to evolve without requiring the entire system to be rebuilt.
+Individual components can evolve without requiring the entire system to be
+rebuilt.
 
 ---
 
 ## Architecture
 
-The architecture is being developed incrementally.
-
-The current direction is:
-
 ```text
 MiraKV
 │
+├── Collections
+│   └── Collection<T>        typed insert / lookup API
+│
+├── Index
+│   ├── IIndex               shared index contract
+│   ├── AVL Tree             self-balancing, in-memory
+│   └── Hash Table
+│
 ├── Storage Engine
-│   ├── Pages
-│   ├── Records
-│   └── Page Manager
+│   ├── Page Manager         16 KiB pages, slots, persistence
+│   └── (planned) Buffer Pool
 │
 ├── Binary Format
-│   ├── Binary Envelope
-│   ├── Primitive Codecs
-│   └── Object Codec
-│
-├── Index Manager
-│   ├── Hash
-│   ├── AVL
-│   ├── B+Tree
-│   ├── LSM
-│   └── Learned Indexes
+│   ├── Binary Envelope      [version][type][length][payload][encoding]
+│   ├── Primitive Codecs     string · number · boolean · date
+│   ├── Object Codec         nested objects
+│   └── Array Codec          homogeneous primitive arrays
 │
 └── Future
+    ├── Adaptive Index
     ├── Query Engine
-    ├── Aggregations
     ├── Partitioning
     └── Replication
 ```
 
-Some components shown above represent planned areas of exploration and are not yet implemented.
+Some components above are planned areas of exploration and are not yet
+implemented.
 
 ---
 
 ## Binary Format
 
-MiraKV uses a custom binary representation instead of relying on a language-specific serialization format.
+MiraKV uses a custom binary representation instead of a language-specific
+serialization format.
 
-The current binary envelope is:
+The binary envelope is:
 
 ```text
 ┌─────────┬──────┬────────┬─────────────┬──────────┐
 │ Version │ Type │ Length │   Payload   │ Encoding │
 └─────────┴──────┴────────┴─────────────┴──────────┘
-```
 
-```text
 Version  → 1 byte
 Type     → 1 byte
 Length   → 4 bytes
@@ -122,20 +134,15 @@ Payload  → N bytes
 Encoding → 1 byte
 ```
 
-Current value types include:
+Current value types:
 
 ```text
-String
-Number
-Boolean
-Object
+Boolean · Number · String · Object · Date · Array (homogeneous)
 ```
-
-The format is designed around the binary representation itself rather than around a specific programming language.
 
 ### Cross-language validation
 
-The binary format has already been tested across different languages:
+The binary format has been tested across independent implementations:
 
 ```text
 TypeScript → Rust
@@ -143,9 +150,12 @@ TypeScript → Go
 Rust       → TypeScript
 ```
 
-The same binary representation can therefore be produced and consumed by independent implementations.
+Cross-language validation covers all current value types — primitives,
+object, date, and homogeneous array. The same binary representation is
+produced and consumed by independent implementations.
 
-This is an important design property of MiraKV: the storage format should belong to the protocol, not to the language that produced it.
+This is a core design property of MiraKV: the storage format belongs to the
+protocol, not to the language that produced it.
 
 See the [Binary Format documentation](docs/binary-format/mira-kv-binary-format.md).
 
@@ -153,9 +163,8 @@ See the [Binary Format documentation](docs/binary-format/mira-kv-binary-format.m
 
 ## Storage Model
 
-MiraKV uses a Page-based storage model.
-
-A Page is a logical storage unit containing:
+MiraKV uses a page-based storage model. A page is a fixed-size unit
+containing:
 
 ```text
 ┌──────────────────────────────┐
@@ -169,89 +178,67 @@ A Page is a logical storage unit containing:
 └──────────────────────────────┘
 ```
 
-Slots grow from the beginning of the Page while Records grow from the end toward the beginning.
-
-The Slot metadata allows the engine to locate records through an `offset` and `length`.
+Slots grow from the start of the page while records grow from the end toward
+the beginning. Each slot locates a record through an `offset` and `length`.
 
 See the [Page documentation](docs/storage/page.md).
 
 ---
 
-## Documentation
+## Benchmarks
 
-### Architecture
+Early write-path benchmarks (Apple M5, Node.js) show linear scaling:
 
-- [Motivation](docs/architecture/motivation.md)
-- [Principles](docs/architecture/principles.md)
+| Records | Time | On-disk |
+| ---: | ---: | ---: |
+| 1,000,000 | ~4.6 s | ~1.2 GB |
+| 10,000,000 | ~48 s | ~11.7 GB |
 
-### Storage
-
-- [Page](docs/storage/page.md)
-
-### Binary Format
-
-- [MiraKV Binary Format](docs/binary-format/mira-kv-binary-format.md)
+Indexing cost was found to be negligible relative to disk I/O on the write
+path. Full details and methodology in [docs/benchmarks.md](docs/benchmarks.md).
 
 ---
 
 ## Current Status
 
-MiraKV is under active development.
-
-Current work includes:
-
-- [x] Binary envelope
-- [x] String serialization
-- [x] Number serialization
-- [x] Boolean serialization
-- [x] Object serialization
-- [x] Nested object serialization
+**Working**
+- [x] Binary envelope + versioning
+- [x] Codecs: string, number, boolean, object, nested object, date, array
 - [x] Binary deserialization
-- [x] Cross-language validation with Rust
-- [x] Cross-language validation with Go
-- [ ] Page implementation
-- [ ] Persistent Page Manager
-- [ ] Record allocation
-- [ ] Index Manager
-- [ ] Query engine
-- [ ] Aggregations
-- [ ] Partitioning
-- [ ] Replication
+- [x] Cross-language validation (Rust, Go) — all current value types
+- [x] Page-based storage with slots and disk persistence
+- [x] AVL index + hash table over `IIndex`
+- [x] Typed `Collection<T>` insert / lookup
 
-The roadmap is intentionally incremental. Design decisions may change as the underlying mechanisms are implemented and tested.
+**In progress / planned**
+- [ ] Storage abstraction (`IStorage`) to decouple collections from paging
+- [ ] Multi-page reads and one file per collection
+- [ ] Buffer pool (avoid reading the whole file per lookup)
+- [ ] Durability (fsync / write-ahead log)
+- [ ] Update / delete and space reclamation
+- [ ] Adaptive indexing
+- [ ] Query engine, partitioning, replication
+
+The roadmap is intentionally incremental. Design decisions may change as the
+underlying mechanisms are implemented and tested.
 
 ---
 
 ## Development
 
-The project is currently implemented in TypeScript and uses Node.js APIs for low-level binary and filesystem operations.
-
-Additional Rust and Go implementations are used as independent interoperability experiments for the MiraKV binary format.
+MiraKV is implemented in TypeScript and uses Node.js APIs for low-level
+binary and filesystem operations. Independent Rust and Go implementations
+exist as interoperability experiments for the MiraKV binary format.
 
 ---
 
 ## Project Philosophy
 
-MiraKV is an implementation laboratory.
-
-The objective is not only to make the engine work, but to understand why each mechanism exists, how it is represented physically, what trade-offs it introduces, and how the individual components interact.
-
-The project evolves from low-level representations toward higher-level database capabilities:
+MiraKV is an implementation laboratory. The objective is not only to make the
+engine work, but to understand why each mechanism exists, how it is
+represented physically, what trade-offs it introduces, and how the components
+interact.
 
 ```text
-Data
- ↓
-Binary Representation
- ↓
-Records
- ↓
-Pages
- ↓
-Storage Engine
- ↓
-Indexes
- ↓
-Queries
- ↓
-Distribution
+Data → Binary Representation → Records → Pages → Storage Engine → Indexes → Queries → Distribution
 ```
