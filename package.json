@@ -1,5 +1,12 @@
 {
-  "name": "kv-engine",
+  "name": "mirakv-engine",
+  "bin": {
+    "mirakv": "./src/networking/network.ts"
+  },
+  "scripts": {
+    "run:server": "tsx src/networking/network.ts --port 9999",
+    "run:client": "tsx src/networking/client.ts --port 7777"
+  },
   "dependencies": {},
   "devDependencies": {
     "@types/bun": "^1.4.2",

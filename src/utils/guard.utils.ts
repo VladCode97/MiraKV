@@ -21,7 +21,23 @@ export function isString(input: unknown): input is string {
  * @returns `true` and narrows the type to `number` if the check passes.
  */
 export function isNumber(input: unknown): input is number {
-  return typeof input === "number";
+  return typeof input === "number" && !Number.isNaN(input);
+}
+
+/**
+ * Checks whether `input` is a `port valid`.
+ *
+ * @param input - The value to test.
+ * @returns `true` and narrows the type to `number` if the check passes.
+ */
+export function isPortValid(input: unknown): input is number {
+  return (
+    isNumber(input) &&
+    Number.isFinite(input) &&
+    Number.isInteger(input) &&
+    input >= 0 &&
+    input <= 65535
+  );
 }
 
 /**
