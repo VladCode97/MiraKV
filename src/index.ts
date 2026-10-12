@@ -46,7 +46,6 @@ async function main() {
   await userCollection.insert(userLuis, userLuis.doc);
   await userCollection.insert(userJudith, userJudith.doc);
   await userCollection.insert(userCelmira, userCelmira.doc);
-
   const response = await userCollection.findById(userLuis.doc);
   console.log(response);
 }

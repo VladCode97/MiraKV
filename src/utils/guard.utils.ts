@@ -25,10 +25,14 @@ export function isNumber(input: unknown): input is number {
 }
 
 /**
- * Checks whether `input` is a `port valid`.
+ * Checks whether `input` is a valid TCP port number.
+ *
+ * A valid port is a finite integer in the range `[0, 65535]`. Used by the
+ * networking layer to validate the port passed on the command line before
+ * starting a server or opening a client connection.
  *
  * @param input - The value to test.
- * @returns `true` and narrows the type to `number` if the check passes.
+ * @returns `true` and narrows the type to `number` if `input` is a valid port.
  */
 export function isPortValid(input: unknown): input is number {
   return (

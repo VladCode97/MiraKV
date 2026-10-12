@@ -39,7 +39,7 @@ export class Collection<T> {
    * @param record - The record to store.
    * @param key    - The key used to index and later retrieve the record.
    */
-  async insert(record: T, key: string): Promise<void> {
+  async insert(record: T, key?: string): Promise<void> {
     await this.pageManager.initialize();
     this.pageManager.appendRecord(record, key);
     await this.pageManager.close();
