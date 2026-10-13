@@ -16,6 +16,18 @@ export const Insert = createToken({
   pattern: /INSERT/,
 });
 
+/** Keyword that begins a get command: `GET`. */
+export const Get = createToken({
+  name: "GET",
+  pattern: /GET/,
+});
+
+/** Keyword declaring the index key of an insert command: `KEY`. */
+export const Key = createToken({
+  name: "KEY",
+  pattern: /KEY/,
+});
+
 /** Keyword linking the operation to its target collection: `IN`. */
 export const In = createToken({
   name: "In",
@@ -153,6 +165,8 @@ export const WhiteSpace = createToken({
 export const ALL_TOKENS = [
   //Keywords
   Insert,
+  Get,
+  Key,
   In,
   //Identifier
   Identifier,

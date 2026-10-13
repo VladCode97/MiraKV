@@ -11,9 +11,11 @@ import {
   Comma,
   DateType,
   DateValue,
+  Get,
   Identifier,
   In,
   Insert,
+  Key,
   NumberType,
   NumberValue,
   ObjectEnd,
@@ -23,7 +25,12 @@ import {
   StringValue,
 } from "../lexer/mirakv-lexer";
 
-import { TParser, TTypedValue } from "../../domain/types/parser.type";
+import {
+  TGetCommand,
+  TParser,
+  TTypedValue,
+  TValue,
+} from "../../domain/types/parser.type";
 
 /**
  * Parser for the MiraQL query language.
@@ -44,30 +51,40 @@ import { TParser, TTypedValue } from "../../domain/types/parser.type";
 export class MiraKVParser extends EmbeddedActionsParser {
   private static miraKVParser: MiraKVParser;
 
+  private commandRule!: ReturnType<MiraKVParser["command"]>;
   private insertCommandRule!: ReturnType<MiraKVParser["insertCommand"]>;
+  private getCommandRule!: ReturnType<MiraKVParser["getCommand"]>;
   private typedValueRule!: ReturnType<MiraKVParser["typedValue"]>;
   private objectRule!: ReturnType<MiraKVParser["object"]>;
   private propertyRule!: ReturnType<MiraKVParser["property"]>;
+  private valueRule!: ReturnType<MiraKVParser["value"]>;
   private primitiveValueRule!: ReturnType<MiraKVParser["primitiveValue"]>;
   private arrayRule!: ReturnType<MiraKVParser["array"]>;
   private arrayValuesRule!: ReturnType<MiraKVParser["arrayValues"]>;
   private stringArrayRule!: ReturnType<MiraKVParser["stringArray"]>;
   private numberArrayRule!: ReturnType<MiraKVParser["numberArray"]>;
   private booleanArrayRule!: ReturnType<MiraKVParser["booleanArray"]>;
+  private objectArrayRule!: ReturnType<MiraKVParser["objectArray"]>;
+  private nestedArrayRule!: ReturnType<MiraKVParser["nestedArray"]>;
 
   private constructor() {
     super(ALL_TOKENS, { recoveryEnabled: true });
 
+    this.commandRule = this.command();
     this.insertCommandRule = this.insertCommand();
+    this.getCommandRule = this.getCommand();
     this.typedValueRule = this.typedValue();
     this.objectRule = this.object();
     this.propertyRule = this.property();
+    this.valueRule = this.value();
     this.primitiveValueRule = this.primitiveValue();
     this.arrayRule = this.array();
     this.arrayValuesRule = this.arrayValues();
     this.stringArrayRule = this.stringArray();
     this.numberArrayRule = this.numberArray();
     this.booleanArrayRule = this.booleanArray();
+    this.objectArrayRule = this.objectArray();
+    this.nestedArrayRule = this.nestedArray();
 
     this.performSelfAnalysis();
   }
@@ -86,21 +103,71 @@ export class MiraKVParser extends EmbeddedActionsParser {
   }
 
   /**
+   * Root grammar rule.
+   *
+   * Dispatches to the appropriate command rule based on the leading
+   * keyword — `INSERT` or `GET` — and returns the resulting command.
+   */
+  public command() {
+    return this.RULE("command", (): TParser => {
+      return this.OR([
+        { ALT: () => this.SUBRULE(this.insertCommandRule) },
+        { ALT: () => this.SUBRULE(this.getCommandRule) },
+      ]);
+    });
+  }
+
+  /**
+   * Grammar rule for a get command.
+   *
+   * Matches `GET IN <Identifier>` with an optional trailing key:
+   * - `GET IN USERS "key"` → fetch a single record by key (`findById`).
+   * - `GET IN USERS`       → fetch every record (`find`).
+   *
+   * The optional key is what distinguishes the two forms, surfaced as an
+   * optional `key` field on the returned {@link TGetCommand}.
+   */
+  public getCommand() {
+    return this.RULE("getCommand", (): TGetCommand => {
+      this.CONSUME(Get);
+      this.CONSUME(In);
+      const collection = this.CONSUME(Identifier);
+
+      let key: string | undefined;
+      this.OPTION(() => {
+        const keyToken = this.CONSUME(StringValue);
+        key = this.ACTION(() => JSON.parse(keyToken.image));
+      });
+
+      // With exactOptionalPropertyTypes, only attach `key` when present so
+      // the "fetch all" form truly omits the property rather than setting
+      // it to undefined.
+      return key === undefined
+        ? { operation: "GET", collection: collection.image }
+        : { operation: "GET", collection: collection.image, key };
+    });
+  }
+
+  /**
    * Grammar rule for an insert command.
    *
-   * Matches `INSERT IN <Identifier> <typedValue>` and returns the command
-   * as a {@link TParser}, merging the collection name with the parsed
-   * typed value.
+   * Matches `INSERT IN <Identifier> KEY <StringValue> <typedValue>` and
+   * returns the command as a {@link TParser}, merging the collection name,
+   * the mandatory key, and the parsed typed value.
    */
   public insertCommand() {
     return this.RULE("insertCommand", (): TParser => {
       this.CONSUME(Insert);
       this.CONSUME(In);
       const collection = this.CONSUME(Identifier);
+      this.CONSUME(Key);
+      const keyToken = this.CONSUME(StringValue);
+      const key = this.ACTION(() => JSON.parse(keyToken.image));
       const typedValue = this.SUBRULE(this.typedValueRule);
       return {
         operation: "INSERT",
         collection: collection.image,
+        key,
         ...typedValue,
       };
     });
@@ -193,11 +260,11 @@ export class MiraKVParser extends EmbeddedActionsParser {
    * single plain object.
    */
   private object() {
-    return this.RULE("object", () => {
+    return this.RULE("object", (): { [key: string]: TValue } => {
       this.CONSUME(ObjectStart);
 
       const firstProperty = this.SUBRULE(this.propertyRule);
-      const result = { ...firstProperty };
+      const result: { [key: string]: TValue } = { ...firstProperty };
 
       this.MANY(() => {
         this.CONSUME(Comma);
@@ -215,18 +282,36 @@ export class MiraKVParser extends EmbeddedActionsParser {
   /**
    * Grammar rule for a single object property.
    *
-   * Matches `"key" : primitiveValue` and returns a one-entry object.
+   * Matches `"key" : value`, where `value` may be a primitive, a nested
+   * object, or an array — enabling arbitrary nesting.
    */
   private property() {
-    return this.RULE("property", () => {
+    return this.RULE("property", (): { [key: string]: TValue } => {
       const keyToken = this.CONSUME(StringValue);
       const key = this.ACTION(() => JSON.parse(keyToken.image));
 
       this.CONSUME(Colon);
 
-      const value = this.SUBRULE(this.primitiveValueRule);
+      const value = this.SUBRULE(this.valueRule);
 
       return { [key]: value };
+    });
+  }
+
+  /**
+   * Grammar rule for any value: a primitive, a nested object, or an array.
+   *
+   * This is the recursive core that enables nesting — objects and arrays
+   * reach back into this rule for their contents, so structures can nest to
+   * any depth.
+   */
+  private value() {
+    return this.RULE("value", (): TValue => {
+      return this.OR([
+        { ALT: () => this.SUBRULE(this.primitiveValueRule) },
+        { ALT: () => this.SUBRULE(this.objectRule) },
+        { ALT: () => this.SUBRULE(this.arrayRule) },
+      ]);
     });
   }
 
@@ -237,7 +322,7 @@ export class MiraKVParser extends EmbeddedActionsParser {
    * its JavaScript representation.
    */
   private primitiveValue() {
-    return this.RULE("primitiveValue", () => {
+    return this.RULE("primitiveValue", (): TValue => {
       return this.OR([
         {
           ALT: () => {
@@ -275,7 +360,7 @@ export class MiraKVParser extends EmbeddedActionsParser {
    * element via {@link arrayValues}, enforcing homogeneity.
    */
   private array() {
-    return this.RULE("array", () => {
+    return this.RULE("array", (): TValue[] => {
       this.CONSUME(ArrayStart);
 
       const values = this.SUBRULE(this.arrayValuesRule);
@@ -294,7 +379,7 @@ export class MiraKVParser extends EmbeddedActionsParser {
    * mixed-type arrays are not valid.
    */
   private arrayValues() {
-    return this.RULE("arrayValues", () => {
+    return this.RULE("arrayValues", (): TValue[] => {
       return this.OR([
         {
           ALT: () => this.SUBRULE(this.stringArrayRule),
@@ -305,6 +390,12 @@ export class MiraKVParser extends EmbeddedActionsParser {
         {
           ALT: () => this.SUBRULE(this.booleanArrayRule),
         },
+        {
+          ALT: () => this.SUBRULE(this.objectArrayRule),
+        },
+        {
+          ALT: () => this.SUBRULE(this.nestedArrayRule),
+        },
       ]);
     });
   }
@@ -313,10 +404,10 @@ export class MiraKVParser extends EmbeddedActionsParser {
    * Grammar rule for a comma-separated list of string literals.
    */
   private stringArray() {
-    return this.RULE("stringArray", () => {
+    return this.RULE("stringArray", (): TValue[] => {
       const firstToken = this.CONSUME(StringValue);
 
-      const values = [this.ACTION(() => JSON.parse(firstToken.image))];
+      const values: TValue[] = [this.ACTION(() => JSON.parse(firstToken.image))];
 
       this.MANY(() => {
         this.CONSUME(Comma);
@@ -334,9 +425,9 @@ export class MiraKVParser extends EmbeddedActionsParser {
    * Grammar rule for a comma-separated list of number literals.
    */
   private numberArray() {
-    return this.RULE("numberArray", () => {
+    return this.RULE("numberArray", (): TValue[] => {
       const firstToken = this.CONSUME(NumberValue);
-      const values = [Number(firstToken.image)];
+      const values: TValue[] = [Number(firstToken.image)];
 
       this.MANY(() => {
         this.CONSUME(Comma);
@@ -353,9 +444,9 @@ export class MiraKVParser extends EmbeddedActionsParser {
    * Grammar rule for a comma-separated list of boolean literals.
    */
   private booleanArray() {
-    return this.RULE("booleanArray", () => {
+    return this.RULE("booleanArray", (): TValue[] => {
       const firstToken = this.CONSUME(BooleanValue);
-      const values = [firstToken.image === "true"];
+      const values: TValue[] = [firstToken.image === "true"];
 
       this.MANY(() => {
         this.CONSUME(Comma);
@@ -369,7 +460,49 @@ export class MiraKVParser extends EmbeddedActionsParser {
   }
 
   /**
+   * Grammar rule for a comma-separated list of objects.
+   *
+   * Keeps arrays homogeneous: every element is an object. Each element
+   * recurses through {@link object}, so arrays of objects can themselves
+   * contain nested objects and arrays.
+   */
+  private objectArray() {
+    return this.RULE("objectArray", (): TValue[] => {
+      const values: TValue[] = [this.SUBRULE(this.objectRule)];
+
+      this.MANY(() => {
+        this.CONSUME(Comma);
+        values.push(this.SUBRULE2(this.objectRule));
+      });
+
+      return values;
+    });
+  }
+
+  /**
+   * Grammar rule for a comma-separated list of arrays.
+   *
+   * Keeps arrays homogeneous: every element is itself an array. Each element
+   * recurses through {@link array}, allowing arrays nested to any depth.
+   */
+  private nestedArray() {
+    return this.RULE("nestedArray", (): TValue[] => {
+      const values: TValue[] = [this.SUBRULE(this.arrayRule)];
+
+      this.MANY(() => {
+        this.CONSUME(Comma);
+        values.push(this.SUBRULE2(this.arrayRule));
+      });
+
+      return values;
+    });
+  }
+
+  /**
    * Parses a token stream into a structured MiraQL command.
+   *
+   * Enters through the root {@link command} rule, which selects between the
+   * supported operations (`INSERT`, `GET`).
    *
    * @param tokens - Tokens produced by `MiraKVLexer.tokenize`.
    * @returns An object with the parsed `result` and any `errors` collected
@@ -377,7 +510,7 @@ export class MiraKVParser extends EmbeddedActionsParser {
    */
   public parse(tokens: IToken[]) {
     this.input = tokens;
-    const result = this.insertCommandRule();
+    const result = this.commandRule();
     return {
       result,
       errors: this.errors,

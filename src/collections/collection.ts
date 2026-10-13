@@ -47,9 +47,11 @@ export class Collection<T> {
 
   /**
    * Retrieves every record currently stored in the collection's page.
+   *
+   * @returns All records in the collection, or `undefined` if none.
    */
-  async find() {
-    this.pageManager.getPage();
+  async find(): Promise<unknown[] | undefined> {
+    return this.pageManager.getPage();
   }
 
   /**

@@ -8,13 +8,15 @@
  * the result against a {@link Collection}. Lexer and parser errors are
  * reported without exiting the prompt.
  *
- * Command shape:
+ * Command shapes:
  * ```text
- * <OPERATION> IN <COLLECTION> --<TYPE> <VALUE>
+ * INSERT IN <COLLECTION> KEY "<key>" --<TYPE> <VALUE>
+ * GET IN <COLLECTION> "<key>"     // fetch one record by key
+ * GET IN <COLLECTION>             // fetch all records
  * ```
  *
- * Only `OBJECT`-typed values are currently executed (inserted). Other
- * value types parse successfully but are rejected at execution time.
+ * On INSERT, only `OBJECT`-typed values are currently executed. Other value
+ * types parse successfully but are rejected at execution time.
  */
 import { createInterface } from "node:readline";
 import { MiraKVLexer } from "../language/lexer/mirakv-lexer";
@@ -44,12 +46,28 @@ terminal.on("line", async (line) => {
     terminal.prompt();
     return;
   }
-  if (result.type !== "OBJECT") {
-    console.error("Only OBJECT values are supported.");
-    terminal.prompt();
-    return;
+
+  switch (result.operation) {
+    case "INSERT": {
+      if (result.type !== "OBJECT") {
+        console.error("Only OBJECT values are supported.");
+        break;
+      }
+      await collection.insert(result.value, result.key);
+      console.log("INSERT SUCCESSFUL:", result.value);
+      break;
+    }
+    case "GET": {
+      if (result.key !== undefined) {
+        const found = await collection.findById(result.key);
+        console.log("GET:", found);
+      } else {
+        const all = await collection.find();
+        console.log("GET ALL:", all);
+      }
+      break;
+    }
   }
-  await collection.insert(result.value);
-  console.log("INSERT SUCCESSFUL:", result.value);
+
   terminal.prompt();
 });
