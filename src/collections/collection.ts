@@ -39,7 +39,7 @@ export class Collection<T> {
    * @param record - The record to store.
    * @param key    - The key used to index and later retrieve the record.
    */
-  async insert(record: T, key: string): Promise<void> {
+  async insert(record: T, key?: string): Promise<void> {
     await this.pageManager.initialize();
     this.pageManager.appendRecord(record, key);
     await this.pageManager.close();
@@ -47,9 +47,11 @@ export class Collection<T> {
 
   /**
    * Retrieves every record currently stored in the collection's page.
+   *
+   * @returns All records in the collection, or `undefined` if none.
    */
-  async find() {
-    this.pageManager.getPage();
+  async find(): Promise<unknown[] | undefined> {
+    return this.pageManager.getPage();
   }
 
   /**

@@ -62,7 +62,7 @@ export class PageManager {
    * for insertion into a page.
    * @param record Record to serialize.
    */
-  public async appendRecord(record: unknown, key: string): Promise<void> {
+  public async appendRecord(record: unknown, keyIndex?: string): Promise<void> {
     const recordSerialized = this.serializer.serialize(record);
     const newSlotEnd = this.slotEnd + this.SLOT_SIZE;
     const newRecordStart = this.recordStart - recordSerialized.byteLength;
@@ -78,10 +78,12 @@ export class PageManager {
     this.allocateSlot(slotId, offset, length);
     this.updateSlotCount();
     const header = this.pageBuffer.subarray(0, 9);
-    this.indexAVL.append(key, {
-      pageId: header.readUInt32LE(1),
-      slotId: slotId,
-    });
+    if (keyIndex) {
+      this.indexAVL.append(keyIndex, {
+        pageId: header.readUInt32LE(1),
+        slotId: slotId,
+      });
+    }
   }
 
   /**

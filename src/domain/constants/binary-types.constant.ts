@@ -76,7 +76,7 @@ export const NUMBER_FORMAT = {
 export const BOOLEAN_FORMAT = {
   type: BINARY_TYPE.BOOLEAN,
   SIZE_BYTE: 1,
-};
+} as const;
 
 /**
  * Defines the binary format used to represent string values.
@@ -85,4 +85,4 @@ export const BOOLEAN_FORMAT = {
  */
 export const STRING_FORMAT = {
   type: BINARY_TYPE.STRING,
-};
+} as const;
