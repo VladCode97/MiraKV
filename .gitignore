@@ -38,3 +38,11 @@ temp/
 
 # Debug utilities (local only)
 debug/
+
+# Rust build artifacts (MiraKV core)
+MiraKV/target/
+MiraKV/**/target/
+
+# napi-rs compiled native addon (regenerated on build)
+*.node
+MiraKV/index.node
