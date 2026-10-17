@@ -36,8 +36,9 @@ impl Serializer for BooleanCodecSerializer {
     /// `Ok(Value::Boolean)` with the decoded value, or `Err(String)` if the
     /// payload is empty.
     fn deserialize(&self, record: &[u8]) -> Result<Value, String> {
-       let byte = *record.first()
-           .ok_or_else(|| "boolean payload is empty".to_string())?;
+        let byte = *record
+            .first()
+            .ok_or_else(|| "boolean payload is empty".to_string())?;
         Ok(Value::Boolean(byte != 0))
     }
 }

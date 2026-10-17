@@ -19,10 +19,10 @@ impl Serializer for NumberCodecSerializer {
     /// # Returns
     /// An 8-byte little-endian IEEE 754 binary64 buffer.
     fn serialize(&self, record: &Value) -> Vec<u8> {
-       match record {
-           Value::Number(value) => value.to_le_bytes().to_vec(),
-           other => panic!("NumberCodec expected Number, got {:?}", other),
-       }
+        match record {
+            Value::Number(value) => value.to_le_bytes().to_vec(),
+            other => panic!("NumberCodec expected Number, got {:?}", other),
+        }
     }
 
     /// Deserializes an 8-byte IEEE 754 binary64 payload back into a number.
@@ -34,8 +34,9 @@ impl Serializer for NumberCodecSerializer {
     /// `Ok(Value::Number)` with the decoded value, or `Err(String)` if the
     /// payload is not exactly 8 bytes.
     fn deserialize(&self, record: &[u8]) -> Result<Value, String> {
-       let bytes: [u8; 8] = record.try_into()
-           .map_err(|_| "number payload must be exactly 8 bytes".to_string())?;
-       Ok(Value::Number(f64::from_le_bytes(bytes)))
+        let bytes: [u8; 8] = record
+            .try_into()
+            .map_err(|_| "number payload must be exactly 8 bytes".to_string())?;
+        Ok(Value::Number(f64::from_le_bytes(bytes)))
     }
 }

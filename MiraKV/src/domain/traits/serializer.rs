@@ -16,7 +16,6 @@ pub trait Serializer {
     /// # Returns
     /// The binary representation of the value.
     fn serialize(&self, record: &Value) -> Vec<u8>;
-
     /// Deserializes a binary representation back into a value.
     ///
     /// # Arguments

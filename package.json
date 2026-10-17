@@ -8,6 +8,7 @@
     "run:client": "tsx src/networking/client.ts --port 9999"
   },
   "devDependencies": {
+    "@napi-rs/cli": "^3.10.8",
     "@types/bun": "^1.4.2",
     "@types/node": "^26.6.4"
   },

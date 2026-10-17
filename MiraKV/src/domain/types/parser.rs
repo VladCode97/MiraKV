@@ -12,6 +12,23 @@ pub enum Operation {
     Get,
 }
 
+/// A homogeneous array of primitives.
+///
+/// Each variant holds a `Vec` of a single primitive type, so homogeneity is
+/// guaranteed by the type system — an array cannot mix, say, numbers and
+/// strings. Used as the payload of `Value::Array`.
+#[derive(Debug, Clone)]
+pub enum PrimitiveValues {
+    /// Array of UTF-8 strings.
+    String(Vec<String>),
+    /// Array of numbers (IEEE 754 binary64).
+    Number(Vec<f64>),
+    /// Array of booleans.
+    Boolean(Vec<bool>),
+    /// Array of dates.
+    Date(Vec<DateTime<Utc>>),
+}
+
 /// A fully parsed MiraQL value.
 ///
 /// Recursive by design: a value is a primitive, an object whose property
@@ -31,6 +48,6 @@ pub enum Value {
     Date(DateTime<Utc>),
     /// Object: ordered key/value pairs whose values may nest.
     Object(Vec<(String, Value)>),
-    /// Array of homogeneous values, which may themselves nest.
-    Array(Vec<Value>),
+    /// Homogeneous primitive array (see [`PrimitiveValues`]).
+    Array(PrimitiveValues),
 }

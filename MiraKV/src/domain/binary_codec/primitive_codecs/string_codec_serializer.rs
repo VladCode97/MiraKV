@@ -37,7 +37,7 @@ impl Serializer for StringCodecSerializer {
     /// `Ok(Value::String)` with the decoded text, or `Err(String)` if the
     /// bytes are not valid UTF-8.
     fn deserialize(&self, record: &[u8]) -> Result<Value, String> {
-       let bytes = String::from_utf8(record.to_vec()).map_err(|e| e.to_string())?;
+        let bytes = String::from_utf8(record.to_vec()).map_err(|e| e.to_string())?;
         Ok(Value::String(bytes))
     }
 }
